@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>老师评分</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#f8fafc; min-height:100vh; font-family:-apple-system,'PingFang SC',sans-serif; padding:24px 20px 60px; }
+h1 { font-size:22px; font-weight:700; color:#111; margin-bottom:4px; }
+.sub { font-size:14px; color:#94a3b8; margin-bottom:24px; }
+.grp-card { background:#fff; border-radius:14px; box-shadow:0 2px 12px rgba(0,0,0,.06); padding:20px; margin-bottom:16px; }
+.grp-card.scored { border-left:4px solid #10b981; }
+.grp-num { font-size:11px; font-weight:700; color:#6366f1; letter-spacing:1px; margin-bottom:6px; }
+.grp-members { font-size:15px; color:#111; margin-bottom:16px; }
+.scored-tag { display:inline-flex; gap:6px; background:#f0fdf4; border:1px solid #86efac; border-radius:99px; padding:4px 12px; font-size:13px; color:#16a34a; font-weight:600; margin-bottom:12px; }
+.score-row { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
+.score-btn { padding:8px 14px; border-radius:8px; border:2px solid #e5e7eb; background:#fff; font-size:15px; font-weight:600; cursor:pointer; }
+.score-btn.sel { border-color:#6366f1; background:#eef2ff; color:#4338ca; }
+.preset-row { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
+.preset-btn { padding:7px 12px; border-radius:8px; border:1px dashed #e5e7eb; background:#fff; font-size:13px; cursor:pointer; color:#64748b; }
+.preset-btn.sel { border-color:#6366f1; background:#eef2ff; color:#4338ca; }
+textarea { width:100%; padding:12px; font-size:14px; border:2px solid #e5e7eb; border-radius:10px; min-height:60px; resize:none; font-family:inherit; }
+textarea:focus { outline:none; border-color:#6366f1; }
+.save-btn { width:100%; padding:13px; font-size:16px; font-weight:700; background:#6366f1; color:#fff; border:none; border-radius:10px; cursor:pointer; margin-top:10px; }
+label { display:block; font-size:13px; font-weight:600; color:#374151; margin-bottom:8px; }
+</style>
+</head>
+<body>
+<h1>📝 老师评分</h1>
+<p class="sub">评分范围 80–100 分</p>
+<div id="content"><p style="color:#94a3b8;">加载中…</p></div>
+
+<script>
+initSB();
+const sessionId = new URLSearchParams(location.search).get("s");
+const PRESETS = ["内容充实，逻辑清晰，表达流畅","观点明确，有理有据，互动积极","创意突出，角度新颖，值得肯定","表达清晰，重点突出，时间掌控好","基础扎实，完成任务，仍有提升空间"];
+let groups = [], scores = {};
+
+async function load() {
+  const { data: grps } = await sb.from("groups").select("*").eq("session_id", sessionId).order("group_num");
+  groups = grps || [];
+  const { data: scs } = await sb.from("teacher_scores").select("*").eq("session_id", sessionId);
+  scores = {};
+  (scs || []).forEach(r => { scores[r.group_id] = r; });
+  render();
+}
+
+function render() {
+  document.getElementById("content").innerHTML = groups.map(g => {
+    const members = JSON.parse(g.members);
+    const ex = scores[g.id];
+    return `<div class="grp-card ${ex?"scored":""}" id="card-${g.id}">
+      <div class="grp-num">第 ${g.group_num} 组 · ${members.length} 人</div>
+      <div class="grp-members">${members.join("、")}</div>
+      ${ex ? `<div class="scored-tag">✓ ${ex.score} 分 · ${ex.comment||"无评语"}</div>` : ""}
+      <label>分数</label>
+      <div class="score-row" id="sr-${g.id}">
+        ${[80,82,85,88,90,92,95,98,100].map(s => `<button class="score-btn ${ex&&ex.score===s?"sel":""}" onclick="pickScore('${g.id}',${s},this)">${s}</button>`).join("")}
+      </div>
+      <input type="hidden" id="sv-${g.id}" value="${ex?.score||85}">
+      <label style="margin-top:12px;">预设评语</label>
+      <div class="preset-row" id="pr-${g.id}">
+        ${PRESETS.map(p => `<button class="preset-btn ${ex&&ex.comment===p?"sel":""}" onclick="pickPreset('${g.id}','${p}',this)">${p}</button>`).join("")}
+      </div>
+      <label>自定义评语</label>
+      <textarea id="cv-${g.id}" placeholder="或输入个性化评价…">${ex?.comment||""}</textarea>
+      <button class="save-btn" onclick="save('${g.id}')">保存 →</button>
+    </div>`;
+  }).join("");
+}
+
+function pickScore(gid, s, btn) {
+  document.querySelectorAll(`#sr-${gid} .score-btn`).forEach(b => b.classList.remove("sel"));
+  btn.classList.add("sel");
+  document.getElementById(`sv-${gid}`).value = s;
+}
+function pickPreset(gid, p, btn) {
+  document.querySelectorAll(`#pr-${gid} .preset-btn`).forEach(b => b.classList.remove("sel"));
+  btn.classList.add("sel");
+  document.getElementById(`cv-${gid}`).value = p;
+}
+
+async function save(gid) {
+  const score = Math.max(80, Math.min(100, parseInt(document.getElementById(`sv-${gid}`).value)));
+  const comment = document.getElementById(`cv-${gid}`).value.trim();
+  await sb.from("teacher_scores")
+    .upsert({ session_id: sessionId, group_id: gid, score, comment }, { onConflict: "group_id" });
+  scores[gid] = { score, comment };
+  render();
+}
+
+load();
+</script>
+</body>
+</html>

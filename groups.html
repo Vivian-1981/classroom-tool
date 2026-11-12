@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>分组结果 · 大屏</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+:root { --bg:#0f1117; --card:#1a1d27; --border:#2a2d3a; --accent:#6366f1; --text:#e2e8f0; --muted:#64748b; --white:#fff; }
+body { background:var(--bg); color:var(--text); font-family:-apple-system,'PingFang SC',sans-serif; padding:40px 48px 60px; }
+h1 { font-size:32px; font-weight:800; color:var(--white); margin-bottom:6px; }
+.meta { font-size:15px; color:var(--muted); margin-bottom:36px; }
+.grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:20px; }
+.grp { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:24px; }
+.grp-num { font-size:12px; font-weight:700; color:var(--accent); letter-spacing:1px; margin-bottom:14px; }
+.member { display:flex; align-items:center; gap:12px; padding:8px 0; border-bottom:1px solid var(--border); font-size:18px; }
+.member:last-child { border-bottom:none; }
+.avatar { width:36px; height:36px; border-radius:50%; background:rgba(99,102,241,.2); color:var(--accent); display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:700; flex-shrink:0; }
+.empty { text-align:center; padding:80px; color:var(--muted); }
+.hint { position:fixed; bottom:16px; right:20px; font-size:13px; color:var(--muted); }
+</style>
+</head>
+<body>
+<h1>📊 分组结果</h1>
+<div class="meta" id="meta">加载中…</div>
+<div class="grid" id="grid"><div class="empty"><div style="font-size:48px;margin-bottom:16px;">⏳</div><p>等待老师发起分组</p></div></div>
+<div class="hint">10秒自动刷新</div>
+<script>
+initSB();
+const sessionId = new URLSearchParams(location.search).get("s");
+async function load() {
+  if (!sessionId) { document.getElementById("meta").textContent = "缺少课堂参数"; return; }
+  const { data } = await sb.from("groups").select("*").eq("session_id", sessionId).order("group_num");
+  if (!data || !data.length) {
+    document.getElementById("meta").textContent = "等待老师发起分组…";
+    document.getElementById("grid").innerHTML = `<div class="empty"><div style="font-size:48px;margin-bottom:16px;">⏳</div><p>等待老师发起分组</p></div>`;
+    return;
+  }
+  const total = data.reduce((s, r) => s + JSON.parse(r.members).length, 0);
+  document.getElementById("meta").textContent = `共 ${data.length} 组 · ${total} 人`;
+  document.getElementById("grid").innerHTML = data.map(r => {
+    const members = JSON.parse(r.members);
+    return `<div class="grp">
+      <div class="grp-num">第 ${r.group_num} 组 · ${members.length} 人</div>
+      ${members.map(m => `<div class="member"><div class="avatar">${m[0]}</div><span>${m}</span></div>`).join("")}
+    </div>`;
+  }).join("");
+}
+load();
+setInterval(load, 10000);
+</script>
+</body>
+</html>

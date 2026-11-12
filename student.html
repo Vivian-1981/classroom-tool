@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>签到 / 互评</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body { background:#f8fafc; min-height:100vh; font-family:-apple-system,'PingFang SC',sans-serif; }
+.view { display:none; min-height:100vh; }
+.view.active { display:flex; flex-direction:column; }
+#checkinView, #expiredView, #doneView { align-items:center; justify-content:center; padding:24px; }
+#expiredView { background:#fff7ed; }
+#doneView { background:#f0fdf4; }
+.card { background:#fff; border-radius:20px; box-shadow:0 4px 24px rgba(0,0,0,.08); padding:36px 28px; width:100%; max-width:380px; }
+.card .icon { font-size:52px; text-align:center; margin-bottom:18px; }
+h1 { font-size:22px; font-weight:700; color:#111; text-align:center; margin-bottom:6px; }
+.sub { font-size:14px; color:#94a3b8; text-align:center; margin-bottom:28px; }
+label { display:block; font-size:13px; font-weight:600; color:#374151; margin-bottom:8px; }
+input[type=text] { width:100%; padding:14px 16px; font-size:17px; border:2px solid #e5e7eb; border-radius:12px; background:#fff; color:#111; outline:none; transition:border-color .2s; }
+input[type=text]:focus { border-color:#6366f1; }
+.hint { font-size:12px; color:#94a3b8; margin-top:6px; line-height:1.5; }
+.btn-submit { width:100%; padding:16px; font-size:17px; font-weight:700; background:linear-gradient(135deg,#6366f1,#8b5cf6); color:#fff; border:none; border-radius:12px; cursor:pointer; margin-top:16px; }
+.btn-submit:disabled { background:#cbd5e1; }
+.error-msg { background:#fef2f2; border:1px solid #fecaca; border-radius:10px; padding:12px 16px; color:#dc2626; font-size:14px; margin-bottom:14px; }
+#groupsView, #evalView { background:#f8fafc; padding:20px 20px 80px; }
+h2 { font-size:20px; font-weight:700; color:#111; margin-bottom:4px; }
+.grp-grid { display:flex; flex-direction:column; gap:12px; margin-top:16px; }
+.grp-card { background:#fff; border-radius:14px; box-shadow:0 2px 12px rgba(0,0,0,.06); padding:18px 20px; }
+.grp-card.mine { border:2px solid #6366f1; }
+.grp-num { font-size:12px; font-weight:700; color:#6366f1; letter-spacing:1px; margin-bottom:8px; }
+.grp-name { font-size:16px; color:#111; line-height:1.9; }
+.eval-card { background:#fff; border-radius:14px; box-shadow:0 2px 12px rgba(0,0,0,.06); padding:18px 20px; margin-bottom:14px; }
+.reactions { display:flex; flex-wrap:wrap; gap:8px; margin:10px 0; }
+.rxn { padding:8px 14px; border-radius:99px; border:2px solid #e5e7eb; background:#fff; font-size:15px; cursor:pointer; }
+.rxn.sel { border-color:#6366f1; background:#eef2ff; font-weight:600; }
+textarea { width:100%; padding:12px; font-size:14px; border:2px solid #e5e7eb; border-radius:10px; min-height:60px; resize:none; font-family:inherit; }
+textarea:focus { outline:none; border-color:#6366f1; }
+.btn-eval { width:100%; padding:12px; font-size:15px; font-weight:700; background:#6366f1; color:#fff; border:none; border-radius:10px; cursor:pointer; margin-top:8px; }
+.bottom-nav { position:fixed; bottom:0; left:0; right:0; background:#fff; border-top:1px solid #e5e7eb; display:flex; z-index:100; }
+.nav-btn { flex:1; padding:12px 8px; font-size:12px; font-weight:600; color:#94a3b8; border:none; background:none; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:3px; }
+.nav-btn.active { color:#6366f1; }
+.nav-btn .ni { font-size:20px; }
+</style>
+</head>
+<body>
+
+<div class="view" id="expiredView">
+  <div class="card" style="text-align:center;">
+    <div class="icon">⏰</div>
+    <h1>二维码已过期</h1>
+    <p class="sub" style="margin-top:8px;">请重新扫描大屏上最新的二维码<br>（码每30秒更新，截图转发无效）</p>
+  </div>
+</div>
+
+<div class="view" id="checkinView">
+  <div class="card">
+    <div class="icon">📋</div>
+    <h1 id="sessionTitle">课堂签到</h1>
+    <p class="sub" id="sessionSub">请填写真实姓名</p>
+    <div id="errorBox" style="display:none;" class="error-msg"></div>
+    <label>你的真实姓名</label>
+    <input type="text" id="nameInput" placeholder="请输入中文姓名" autofocus autocomplete="name" inputmode="text">
+    <div class="hint">请填写花名册上的中文姓名，便于性别均衡分组。</div>
+    <button class="btn-submit" id="submitBtn" onclick="doCheckin()">确认签到 ✓</button>
+  </div>
+</div>
+
+<div class="view" id="doneView">
+  <div class="card" style="text-align:center;">
+    <div class="icon" style="animation:pop .4s ease;">✅</div>
+    <h1>签到成功！</h1>
+    <p style="font-size:20px;font-weight:700;color:#6366f1;margin:12px 0;" id="doneName"></p>
+    <p style="font-size:14px;color:#94a3b8;">等待老师发起分组</p>
+    <button onclick="switchTab('groupsView')" style="margin-top:20px;padding:12px 24px;background:#6366f1;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;">查看分组结果 →</button>
+  </div>
+</div>
+
+<div class="view" id="groupsView">
+  <h2>📊 分组结果</h2>
+  <p style="font-size:14px;color:#94a3b8;" id="groupsStatus">加载中…</p>
+  <div class="grp-grid" id="grpGrid"></div>
+</div>
+
+<div class="view" id="evalView">
+  <h2>⭐ 学生互评</h2>
+  <div id="evalContent" style="margin-top:16px;">加载中…</div>
+</div>
+
+<div class="bottom-nav" id="bottomNav" style="display:none;">
+  <button class="nav-btn active" id="navGroups" onclick="switchTab('groupsView')">
+    <span class="ni">👥</span>分组结果
+  </button>
+  <button class="nav-btn" id="navEval" onclick="switchTab('evalView')">
+    <span class="ni">⭐</span>互评
+  </button>
+</div>
+
+<style>@keyframes pop{0%{transform:scale(0)}70%{transform:scale(1.15)}100%{transform:scale(1)}}</style>
+
+<script>
+initSB();
+const params = new URLSearchParams(location.search);
+const sessionId = params.get("s");
+const token     = params.get("t");
+let myName = localStorage.getItem("sb_my_name") || "";
+let mySessId = localStorage.getItem("sb_my_session") || "";
+const REACTIONS = ["👍 赞","⭐ 优秀","💡 有创意","🎤 表达清晰","✨ 内容详实"];
+
+// ── 路由 ─────────────────────────────────────────────────────────
+(async function route() {
+  if (myName && mySessId === sessionId) { showDone(myName); return; }
+  if (!isValidToken(token)) { showView("expiredView"); return; }
+  if (sessionId) {
+    const { data } = await sb.from("class_sessions").select("label").eq("id", sessionId).single();
+    if (data) document.getElementById("sessionTitle").textContent = data.label;
+  }
+  showView("checkinView");
+})();
+
+// ── 签到 ─────────────────────────────────────────────────────────
+async function doCheckin() {
+  const name = document.getElementById("nameInput").value.trim();
+  if (!name) { showError("请填写真实中文姓名"); return; }
+  const btn = document.getElementById("submitBtn");
+  btn.disabled = true; btn.textContent = "提交中…";
+
+  const { error } = await sb.from("attendance").insert({
+    session_id: sessionId, name, gender: getGender(name)
+  });
+  // error.code === '23505' = unique violation = 已签到过，忽略
+  localStorage.setItem("sb_my_name", name);
+  localStorage.setItem("sb_my_session", sessionId);
+  myName = name; mySessId = sessionId;
+  showDone(name);
+}
+
+function showError(msg) {
+  const b = document.getElementById("errorBox");
+  b.textContent = "⚠️ " + msg; b.style.display = "";
+  document.getElementById("submitBtn").disabled = false;
+  document.getElementById("submitBtn").textContent = "确认签到 ✓";
+}
+
+function showDone(name) {
+  document.getElementById("doneName").textContent = name;
+  showView("doneView");
+  document.getElementById("bottomNav").style.display = "flex";
+  loadGroups(); loadEval();
+}
+
+// ── 分组 ─────────────────────────────────────────────────────────
+async function loadGroups() {
+  const { data } = await sb.from("groups").select("*").eq("session_id", sessionId).order("group_num");
+  const grid = document.getElementById("grpGrid");
+  const status = document.getElementById("groupsStatus");
+  if (!data || !data.length) {
+    status.textContent = "等待老师发起分组…";
+    grid.innerHTML = "";
+    setTimeout(loadGroups, 5000);
+    return;
+  }
+  status.textContent = `共 ${data.length} 组`;
+  grid.innerHTML = data.map(r => {
+    const members = JSON.parse(r.members);
+    const isMine = members.includes(myName);
+    return `<div class="grp-card ${isMine?"mine":""}">
+      <div class="grp-num">第 ${r.group_num} 组 ${isMine?"⭐ 你在这组":""}</div>
+      <div class="grp-name">${members.join("  ·  ")}</div>
+    </div>`;
+  }).join("");
+}
+
+// ── 互评 ─────────────────────────────────────────────────────────
+async function loadEval() {
+  const { data } = await sb.from("groups").select("*").eq("session_id", sessionId).order("group_num");
+  if (!data || !data.length) {
+    document.getElementById("evalContent").innerHTML = "<p style='color:#94a3b8;padding:20px 0;'>等待分组完成后可以互评</p>";
+    return;
+  }
+  document.getElementById("evalContent").innerHTML = data.map(r => {
+    const members = JSON.parse(r.members);
+    return `<div class="eval-card" id="ec-${r.id}">
+      <div class="grp-num">第 ${r.group_num} 组</div>
+      <div style="font-size:14px;color:#374151;margin-bottom:10px;">${members.join("、")}</div>
+      <div class="reactions" id="rxns-${r.id}">
+        ${REACTIONS.map((rx,i) => `<button class="rxn ${i===0?"sel":""}" onclick="pickRxn('${r.id}','${rx}',this)">${rx}</button>`).join("")}
+      </div>
+      <input type="hidden" id="rxnv-${r.id}" value="${REACTIONS[0]}">
+      <textarea id="cmtv-${r.id}" placeholder="写下你的评价（可选）"></textarea>
+      <button class="btn-eval" onclick="submitEval('${r.id}',${r.group_num})">提交对第 ${r.group_num} 组的评价</button>
+    </div>`;
+  }).join("");
+}
+
+function pickRxn(gid, val, btn) {
+  document.querySelectorAll(`#rxns-${gid} .rxn`).forEach(b => b.classList.remove("sel"));
+  btn.classList.add("sel");
+  document.getElementById(`rxnv-${gid}`).value = val;
+}
+
+async function submitEval(gid, groupNum) {
+  await sb.from("peer_scores").insert({
+    session_id: sessionId,
+    from_name: myName,
+    to_group_id: gid,
+    reaction: document.getElementById(`rxnv-${gid}`).value,
+    comment: document.getElementById(`cmtv-${gid}`).value.trim()
+  });
+  document.getElementById(`ec-${gid}`).innerHTML =
+    `<div style="text-align:center;padding:12px;color:#10b981;font-weight:600;">✅ 已提交对第 ${groupNum} 组的评价</div>`;
+}
+
+// ── 导航 ─────────────────────────────────────────────────────────
+function showView(id) {
+  document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+}
+function switchTab(id) {
+  showView(id);
+  document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
+  const map = { groupsView: "navGroups", evalView: "navEval" };
+  if (map[id]) document.getElementById(map[id]).classList.add("active");
+  if (id === "groupsView") loadGroups();
+  if (id === "evalView") loadEval();
+}
+</script>
+</body>
+</html>

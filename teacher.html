@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>老师端 · 课堂分组系统</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<script src="config.js"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+:root { --bg:#0f1117; --card:#1a1d27; --border:#2a2d3a; --accent:#6366f1; --green:#10b981; --warn:#f59e0b; --text:#e2e8f0; --muted:#64748b; --white:#fff; }
+body { background:var(--bg); color:var(--text); font-family:-apple-system,'PingFang SC',sans-serif; min-height:100vh; padding-bottom:40px; }
+.topbar { background:var(--card); border-bottom:1px solid var(--border); padding:14px 20px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:100; }
+.topbar h1 { font-size:17px; font-weight:700; color:var(--white); }
+.session-badge { font-size:12px; padding:4px 10px; border-radius:99px; background:rgba(16,185,129,.15); color:var(--green); border:1px solid var(--green); max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.section { padding:20px; border-bottom:1px solid var(--border); }
+.section-title { font-size:11px; letter-spacing:2px; text-transform:uppercase; color:var(--accent); margin-bottom:14px; }
+.session-form { display:flex; gap:10px; }
+.session-form input { flex:1; background:var(--bg); border:1px solid var(--border); color:var(--text); border-radius:8px; padding:10px 14px; font-size:15px; }
+.session-form input:focus { outline:none; border-color:var(--accent); }
+.qr-wrap { background:var(--white); border-radius:12px; padding:12px; display:inline-block; margin-bottom:12px; }
+.countdown-row { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+.countdown-bar { flex:1; height:5px; background:var(--border); border-radius:3px; overflow:hidden; }
+.countdown-fill { height:100%; background:var(--accent); transition:width .9s linear; }
+.countdown-txt { font-size:13px; color:var(--muted); width:28px; text-align:right; }
+.qr-url { font-size:11px; color:var(--muted); word-break:break-all; }
+.count-big { font-size:40px; font-weight:800; color:var(--white); }
+.count-sub { font-size:14px; color:var(--muted); }
+.attend-list { list-style:none; display:flex; flex-direction:column; gap:6px; margin-top:12px; }
+.attend-item { display:flex; justify-content:space-between; align-items:center; background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:10px 14px; font-size:15px; }
+.badge { font-size:11px; padding:2px 8px; border-radius:99px; }
+.badge-m { background:rgba(99,102,241,.2); color:var(--accent); }
+.badge-f { background:rgba(34,211,238,.15); color:#22d3ee; }
+.group-ctrl { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+.size-select { background:var(--bg); border:1px solid var(--border); color:var(--text); border-radius:8px; padding:10px 14px; font-size:15px; }
+.btn { display:inline-flex; align-items:center; justify-content:center; gap:6px; padding:12px 20px; border-radius:10px; border:none; font-size:15px; font-weight:700; cursor:pointer; transition:opacity .15s; text-decoration:none; }
+.btn:active { opacity:.75; }
+.btn-primary { background:var(--accent); color:#fff; }
+.btn-green { background:var(--green); color:#fff; }
+.btn-secondary { background:var(--card); border:1px solid var(--border); color:var(--text); }
+.btn-sm { padding:8px 14px; font-size:13px; }
+.btn-full { width:100%; margin-top:8px; }
+.groups-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:12px; }
+.grp-card { background:var(--bg); border:1px solid var(--border); border-radius:10px; padding:14px; }
+.grp-num { font-size:11px; color:var(--accent); font-weight:700; letter-spacing:1px; margin-bottom:8px; }
+.grp-names { font-size:14px; line-height:1.8; }
+.empty { text-align:center; padding:32px 20px; color:var(--muted); font-size:15px; }
+.toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--green); color:#fff; padding:10px 20px; border-radius:99px; font-size:14px; font-weight:600; z-index:999; opacity:0; transition:opacity .3s; pointer-events:none; white-space:nowrap; }
+.toast.show { opacity:1; }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <h1>📋 老师端</h1>
+  <span class="session-badge" id="sessionBadge">未开始</span>
+</div>
+
+<div class="section">
+  <div class="section-title">开始课堂</div>
+  <div class="session-form">
+    <input type="text" id="sessionLabel" placeholder="课堂标题（可留空）">
+    <button class="btn btn-primary btn-sm" onclick="newSession()">开始</button>
+  </div>
+</div>
+
+<div class="section" id="qrSection" style="display:none;">
+  <div class="section-title">签到二维码</div>
+  <div class="qr-wrap"><div id="qr-container"></div></div>
+  <div class="countdown-row">
+    <div class="countdown-bar"><div class="countdown-fill" id="cntFill" style="width:100%"></div></div>
+    <div class="countdown-txt" id="cntTxt">30s</div>
+  </div>
+  <div class="qr-url" id="qrUrl"></div>
+</div>
+
+<div class="section">
+  <div class="section-title">到课名单</div>
+  <div style="display:flex;justify-content:space-between;align-items:center;">
+    <div><span class="count-big" id="attendCount">0</span><span class="count-sub"> / 28 人</span></div>
+    <button class="btn btn-secondary btn-sm" onclick="pollAttendance()">刷新</button>
+  </div>
+  <ul class="attend-list" id="attendList">
+    <li><div class="empty">等待学生扫码签到…</div></li>
+  </ul>
+</div>
+
+<div class="section">
+  <div class="section-title">随机分组</div>
+  <div class="group-ctrl">
+    <select class="size-select" id="grpSize">
+      <option value="2">2人一组</option>
+      <option value="3">3人一组</option>
+      <option value="4" selected>4人一组</option>
+      <option value="5">5人一组</option>
+      <option value="6">6人一组</option>
+    </select>
+    <button class="btn btn-green" onclick="doGroup()">⚡ 一键分组</button>
+  </div>
+  <div id="groupsArea"></div>
+  <div id="groupsLinks" style="display:none;">
+    <a id="bigScreenLink" class="btn btn-secondary btn-full" target="_blank">📊 打开大屏展示</a>
+    <a id="evalLink" class="btn btn-secondary btn-full" target="_blank">📝 老师评分页面</a>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+initSB();
+let currentSession = null;
+let pollTimer = null;
+let countdownTimer = null;
+let attendData = [];
+
+(async function init() {
+  const savedId = localStorage.getItem("sb_session_id");
+  if (!savedId) return;
+  const { data } = await sb.from("class_sessions").select("*").eq("id", savedId).eq("is_active", true).single();
+  if (data) setSession(data);
+})();
+
+async function newSession() {
+  const label = document.getElementById("sessionLabel").value.trim()
+    || new Date().toLocaleDateString("zh-CN") + " 课堂";
+  if (currentSession) await sb.from("class_sessions").update({ is_active: false }).eq("id", currentSession.id);
+  const { data, error } = await sb.from("class_sessions").insert({ label }).select().single();
+  if (error) { toast("创建失败: " + error.message); return; }
+  localStorage.setItem("sb_session_id", data.id);
+  setSession(data);
+  toast("课堂已开始 ✓");
+}
+
+function setSession(sess) {
+  currentSession = sess;
+  document.getElementById("sessionBadge").textContent = sess.label;
+  document.getElementById("qrSection").style.display = "";
+  buildQR();
+  startCountdown();
+  startPoll();
+  loadGroups();
+}
+
+function getCheckinURL() {
+  const base = location.href.replace("teacher.html", "student.html");
+  return `${base}?s=${currentSession.id}&t=${makeToken()}`;
+}
+
+function buildQR() {
+  const url = getCheckinURL();
+  document.getElementById("qrUrl").textContent = url;
+  const c = document.getElementById("qr-container");
+  c.innerHTML = "";
+  new QRCode(c, { text: url, width: 200, height: 200, colorDark: "#1a1d27", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.M });
+}
+
+function startCountdown() {
+  if (countdownTimer) clearInterval(countdownTimer);
+  let exp = tokenExpiresIn();
+  function tick() {
+    exp--;
+    if (exp <= 0) { buildQR(); exp = 30; }
+    document.getElementById("cntFill").style.width = (exp / 30 * 100) + "%";
+    document.getElementById("cntTxt").textContent = exp + "s";
+  }
+  tick();
+  countdownTimer = setInterval(tick, 1000);
+}
+
+function startPoll() {
+  if (pollTimer) clearInterval(pollTimer);
+  pollAttendance();
+  pollTimer = setInterval(pollAttendance, 4000);
+}
+
+async function pollAttendance() {
+  if (!currentSession) return;
+  const { data } = await sb.from("attendance").select("name,gender,created_at").eq("session_id", currentSession.id).order("created_at");
+  if (!data) return;
+  attendData = data;
+  document.getElementById("attendCount").textContent = data.length;
+  const list = document.getElementById("attendList");
+  if (!data.length) { list.innerHTML = '<li><div class="empty">等待学生扫码签到…</div></li>'; return; }
+  list.innerHTML = data.map(s => `
+    <li class="attend-item">
+      <span>${s.name}</span>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <span class="badge ${s.gender==="M"?"badge-m":"badge-f"}">${s.gender==="M"?"男":"女"}</span>
+        <span style="font-size:12px;color:var(--muted);">${s.created_at ? s.created_at.slice(11,16) : ""}</span>
+      </div>
+    </li>`).join("");
+}
+
+async function doGroup() {
+  if (!currentSession || !attendData.length) { toast("请先等学生签到"); return; }
+  const size = parseInt(document.getElementById("grpSize").value);
+  const males   = attendData.filter(s => s.gender === "M").sort(() => Math.random()-.5);
+  const females = attendData.filter(s => s.gender === "F").sort(() => Math.random()-.5);
+  const mixed = [];
+  let mi = 0, fi = 0;
+  while (fi < females.length || mi < males.length) {
+    if (fi < females.length) mixed.push(females[fi++]);
+    if (mi < males.length)   mixed.push(males[mi++]);
+  }
+  let groups = [];
+  for (let i = 0; i < mixed.length; i += size) groups.push(mixed.slice(i, i + size));
+  if (groups.length > 1 && groups[groups.length-1].length < 2) groups[groups.length-2].push(...groups.pop());
+
+  await sb.from("groups").delete().eq("session_id", currentSession.id);
+  for (let i = 0; i < groups.length; i++) {
+    await sb.from("groups").insert({
+      session_id: currentSession.id,
+      group_num: i + 1,
+      members: JSON.stringify(groups[i].map(s => s.name))
+    });
+  }
+  toast(`分组完成，共 ${groups.length} 组 ✓`);
+  loadGroups();
+}
+
+async function loadGroups() {
+  if (!currentSession) return;
+  const { data } = await sb.from("groups").select("*").eq("session_id", currentSession.id).order("group_num");
+  const area = document.getElementById("groupsArea");
+  const links = document.getElementById("groupsLinks");
+  if (!data || !data.length) { area.innerHTML = ""; links.style.display = "none"; return; }
+
+  area.innerHTML = `<div class="groups-grid">` + data.map(r => {
+    const members = JSON.parse(r.members);
+    return `<div class="grp-card"><div class="grp-num">第 ${r.group_num} 组</div><div class="grp-names">${members.join("<br>")}</div></div>`;
+  }).join("") + `</div>`;
+
+  const bigUrl = location.href.replace("teacher.html", "groups.html") + `?s=${currentSession.id}`;
+  const evalUrl = location.href.replace("teacher.html", "eval.html") + `?s=${currentSession.id}`;
+  document.getElementById("bigScreenLink").href = bigUrl;
+  document.getElementById("evalLink").href = evalUrl;
+  links.style.display = "";
+}
+
+function toast(msg) {
+  const el = document.getElementById("toast");
+  el.textContent = msg; el.classList.add("show");
+  setTimeout(() => el.classList.remove("show"), 2500);
+}
+</script>
+</body>
+</html>
