@@ -106,7 +106,7 @@ body { background:var(--bg); color:var(--text); font-family:-apple-system,'PingF
 <div class="section">
   <div class="section-title">随机分组</div>
   <div class="group-ctrl">
-    <select class="size-select" id="grpSize">
+    <select class="size-select" id="grpSize" onchange="updatePinOptions()">
       <option value="2">2人一组</option>
       <option value="3">3人一组</option>
       <option value="4" selected>4人一组</option>
@@ -115,6 +115,19 @@ body { background:var(--bg); color:var(--text); font-family:-apple-system,'PingF
     </select>
     <button class="btn btn-green" onclick="doGroup()">⚡ 一键分组</button>
   </div>
+
+  <!-- 内幕设置 -->
+  <div style="margin-top:14px;">
+    <button onclick="togglePin()" style="background:none;border:1px dashed var(--border);color:var(--muted);padding:8px 14px;border-radius:8px;font-size:13px;cursor:pointer;width:100%;">
+      🔒 内幕设置（指定某人必须在某组）
+    </button>
+    <div id="pinPanel" style="display:none;margin-top:12px;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px;">
+      <p style="font-size:13px;color:var(--muted);margin-bottom:10px;">从签到名单中选人，指定他们必须进入哪一组。未指定的人随机分配。</p>
+      <div id="pinList" style="display:flex;flex-direction:column;gap:8px;"></div>
+      <p style="font-size:12px;color:var(--muted);margin-top:10px;">* 预计分 <span id="expectedGroups">-</span> 组（根据签到人数和每组人数计算）</p>
+    </div>
+  </div>
+
   <div id="groupsArea"></div>
   <div id="groupsLinks" style="display:none;">
     <a id="bigScreenLink" class="btn btn-secondary btn-full" target="_blank">📊 打开大屏展示</a>
@@ -224,32 +237,89 @@ async function pollAttendance() {
         <span style="font-size:12px;color:var(--muted);">${s.created_at ? s.created_at.slice(11,16) : ""}</span>
       </div>
     </li>`).join("");
+  updatePinOptions();
 }
 
+// ── 内幕设置 ─────────────────────────────────────────────────────
+function togglePin() {
+  const panel = document.getElementById("pinPanel");
+  panel.style.display = panel.style.display === "none" ? "" : "none";
+  if (panel.style.display !== "none") updatePinOptions();
+}
+
+function updatePinOptions() {
+  if (!attendData.length) return;
+  const size = parseInt(document.getElementById("grpSize").value);
+  const numGroups = Math.ceil(attendData.length / size);
+  document.getElementById("expectedGroups").textContent = numGroups;
+
+  const groupOptions = Array.from({length: numGroups}, (_, i) =>
+    `<option value="${i+1}">第 ${i+1} 组</option>`).join("");
+
+  document.getElementById("pinList").innerHTML = attendData.map(s => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);">
+      <span style="font-size:15px;">${s.name}</span>
+      <select id="pin-${s.name}" style="background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:5px 8px;font-size:13px;">
+        <option value="">随机</option>
+        ${groupOptions}
+      </select>
+    </div>`).join("");
+}
+
+// ── 分组（支持内幕约束） ──────────────────────────────────────────
 async function doGroup() {
   if (!currentSession || !attendData.length) { toast("请先等学生签到"); return; }
   const size = parseInt(document.getElementById("grpSize").value);
-  const males   = attendData.filter(s => s.gender === "M").sort(() => Math.random()-.5);
-  const females = attendData.filter(s => s.gender === "F").sort(() => Math.random()-.5);
+  const numGroups = Math.ceil(attendData.length / size);
+
+  // 读取内幕约束
+  const pinned = {}; // name → groupIndex (0-based)
+  attendData.forEach(s => {
+    const sel = document.getElementById(`pin-${s.name}`);
+    if (sel && sel.value) pinned[s.name] = parseInt(sel.value) - 1;
+  });
+
+  // 初始化空组
+  const groups = Array.from({length: numGroups}, () => []);
+
+  // 先放内幕指定的人
+  Object.entries(pinned).forEach(([name, gi]) => {
+    if (gi < groups.length) groups[gi].push(name);
+  });
+
+  // 剩余的人做性别均衡随机排列
+  const pinnedNames = new Set(Object.keys(pinned));
+  const free = attendData.filter(s => !pinnedNames.has(s.name));
+  const males   = free.filter(s => s.gender === "M").sort(() => Math.random() - .5);
+  const females = free.filter(s => s.gender === "F").sort(() => Math.random() - .5);
   const mixed = [];
   let mi = 0, fi = 0;
   while (fi < females.length || mi < males.length) {
-    if (fi < females.length) mixed.push(females[fi++]);
-    if (mi < males.length)   mixed.push(males[mi++]);
+    if (fi < females.length) mixed.push(females[fi++].name);
+    if (mi < males.length)   mixed.push(males[mi++].name);
   }
-  let groups = [];
-  for (let i = 0; i < mixed.length; i += size) groups.push(mixed.slice(i, i + size));
-  if (groups.length > 1 && groups[groups.length-1].length < 2) groups[groups.length-2].push(...groups.pop());
 
+  // 按顺序填满每组，直到 size
+  let pool = [...mixed];
+  for (let g of groups) {
+    while (g.length < size && pool.length > 0) g.push(pool.shift());
+  }
+  // 若还有剩余（内幕人员挤满了某组），追加到最后一组
+  while (pool.length > 0) groups[groups.length - 1].push(pool.shift());
+
+  // 过滤空组
+  const finalGroups = groups.filter(g => g.length > 0);
+
+  // 保存
   await sb.from("groups").delete().eq("session_id", currentSession.id);
-  for (let i = 0; i < groups.length; i++) {
+  for (let i = 0; i < finalGroups.length; i++) {
     await sb.from("groups").insert({
       session_id: currentSession.id,
       group_num: i + 1,
-      members: JSON.stringify(groups[i].map(s => s.name))
+      members: JSON.stringify(finalGroups[i])
     });
   }
-  toast(`分组完成，共 ${groups.length} 组 ✓`);
+  toast(`分组完成，共 ${finalGroups.length} 组 ✓`);
   loadGroups();
 }
 
