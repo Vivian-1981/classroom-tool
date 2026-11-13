@@ -106,7 +106,7 @@ body { background:var(--bg); color:var(--text); font-family:-apple-system,'PingF
 <div class="section">
   <div class="section-title">随机分组</div>
   <div class="group-ctrl">
-    <select class="size-select" id="grpSize" onchange="updatePinOptions()">
+    <select class="size-select" id="grpSize" onchange="onSizeChange()">
       <option value="2">2人一组</option>
       <option value="3">3人一组</option>
       <option value="4" selected>4人一组</option>
@@ -276,12 +276,13 @@ function getGrpSize() {
   return parseInt(sel.value);
 }
 
-// 切换到自定义时显示输入框
-document.getElementById("grpSize").addEventListener("change", function() {
+function onSizeChange() {
+  const sel = document.getElementById("grpSize");
   const custom = document.getElementById("grpSizeCustom");
-  custom.style.display = this.value === "custom" ? "" : "none";
+  custom.style.display = sel.value === "custom" ? "" : "none";
+  if (sel.value === "custom") custom.focus();
   updatePinOptions();
-});
+}
 
 function updatePinOptions() {
   if (!attendData.length) return;
