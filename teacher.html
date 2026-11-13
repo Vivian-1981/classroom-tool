@@ -62,6 +62,24 @@ body { background:var(--bg); color:var(--text); font-family:-apple-system,'PingF
     <input type="text" id="sessionLabel" placeholder="课堂标题（可留空）">
     <button class="btn btn-primary btn-sm" onclick="newSession()">开始</button>
   </div>
+  <!-- 二维码模式选择 -->
+  <div style="margin-top:14px;display:flex;gap:16px;align-items:center;flex-wrap:wrap;">
+    <label style="display:flex;align-items:center;gap:6px;font-size:14px;cursor:pointer;">
+      <input type="radio" name="qrMode" value="static" onchange="updateMode()"> 静态（不过期）
+    </label>
+    <label style="display:flex;align-items:center;gap:6px;font-size:14px;cursor:pointer;">
+      <input type="radio" name="qrMode" value="dynamic" checked onchange="updateMode()"> 动态（防截图转发）
+    </label>
+    <div id="intervalGroup" style="display:flex;align-items:center;gap:8px;">
+      <span style="font-size:14px;color:var(--muted);">间隔</span>
+      <select class="size-select" id="qrInterval" style="padding:6px 10px;" onchange="buildQR()">
+        <option value="30">30 秒</option>
+        <option value="60">1 分钟</option>
+        <option value="120">2 分钟</option>
+        <option value="300">5 分钟</option>
+      </select>
+    </div>
+  </div>
 </div>
 
 <div class="section" id="qrSection" style="display:none;">
@@ -141,9 +159,22 @@ function setSession(sess) {
   loadGroups();
 }
 
+function getMode() { return document.querySelector('input[name="qrMode"]:checked')?.value || "dynamic"; }
+function getInterval() { return parseInt(document.getElementById("qrInterval").value) || 30; }
+
+function updateMode() {
+  const isDynamic = getMode() === "dynamic";
+  document.getElementById("intervalGroup").style.display = isDynamic ? "flex" : "none";
+  document.getElementById("qrSection").querySelector(".countdown-row").style.display = isDynamic ? "flex" : "none";
+  if (currentSession) buildQR();
+}
+
 function getCheckinURL() {
   const base = location.href.replace("teacher.html", "student.html");
-  return `${base}?s=${currentSession.id}&t=${makeToken()}`;
+  const intervalSec = getInterval();
+  const t = getMode() === "static" ? "static" : makeToken(0, intervalSec);
+  const i = getMode() === "static" ? "" : `&i=${intervalSec}`;
+  return `${base}?s=${currentSession.id}&t=${t}${i}`;
 }
 
 function buildQR() {
@@ -156,11 +187,13 @@ function buildQR() {
 
 function startCountdown() {
   if (countdownTimer) clearInterval(countdownTimer);
-  let exp = tokenExpiresIn();
+  const intervalSec = getInterval();
+  let exp = tokenExpiresIn(intervalSec);
   function tick() {
+    if (getMode() === "static") return;  // 静态模式不倒计时
     exp--;
-    if (exp <= 0) { buildQR(); exp = 30; }
-    document.getElementById("cntFill").style.width = (exp / 30 * 100) + "%";
+    if (exp <= 0) { buildQR(); exp = intervalSec; }
+    document.getElementById("cntFill").style.width = (exp / intervalSec * 100) + "%";
     document.getElementById("cntTxt").textContent = exp + "s";
   }
   tick();

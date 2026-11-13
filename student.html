@@ -107,12 +107,13 @@ const sessionId = params.get("s");
 const token     = params.get("t");
 let myName = localStorage.getItem("sb_my_name") || "";
 let mySessId = localStorage.getItem("sb_my_session") || "";
+const intervalSec = parseInt(params.get("i") || "30");
 const REACTIONS = ["👍 赞","⭐ 优秀","💡 有创意","🎤 表达清晰","✨ 内容详实"];
 
 // ── 路由 ─────────────────────────────────────────────────────────
 (async function route() {
   if (myName && mySessId === sessionId) { showDone(myName); return; }
-  if (!isValidToken(token)) { showView("expiredView"); return; }
+  if (!isValidToken(token, intervalSec)) { showView("expiredView"); return; }
   if (sessionId) {
     const { data } = await sb.from("class_sessions").select("label").eq("id", sessionId).single();
     if (data) document.getElementById("sessionTitle").textContent = data.label;

@@ -72,16 +72,25 @@ const ROSTER = [
   ["陈浩","M"], ["王磊","M"], ["李强","M"],  ["张伟","M"],
 ];
 
-// ── 签到防伪 Token（每30秒轮换，截图转发会过期） ─────────────────
+// ── 签到防伪 Token ────────────────────────────────────────────
+// 静态模式：t="static"，永不过期
+// 动态模式：t=时间token，间隔由老师设置
 const TOKEN_SECRET = "sufe-ls-2025";
 
-function makeToken(offset = 0) {
-  const win = Math.floor(Date.now() / 30000) + offset;
+function makeToken(offset = 0, intervalSec = 30) {
+  const win = Math.floor(Date.now() / (intervalSec * 1000)) + offset;
   let h = 5381;
-  const s = TOKEN_SECRET + win;
+  const s = TOKEN_SECRET + intervalSec + win;
   for (let i = 0; i < s.length; i++) h = (((h << 5) + h) ^ s.charCodeAt(i)) >>> 0;
   return (h % 100000000).toString().padStart(8, "0");
 }
-function isValidToken(t) { return [makeToken(0), makeToken(-1), makeToken(-2)].includes(t); }
-function tokenExpiresIn() { return 30 - (Math.floor(Date.now() / 1000) % 30); }
+
+function isValidToken(t, intervalSec = 30) {
+  if (!t || t === "static") return true;  // 静态模式直接通过
+  return [makeToken(0, intervalSec), makeToken(-1, intervalSec), makeToken(-2, intervalSec)].includes(t);
+}
+
+function tokenExpiresIn(intervalSec = 30) {
+  return intervalSec - (Math.floor(Date.now() / 1000) % intervalSec);
+}
 function getGender(name) { const e = ROSTER.find(r => r[0] === name); return e ? e[1] : "F"; }
