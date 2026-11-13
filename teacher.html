@@ -95,7 +95,7 @@ body { background:var(--bg); color:var(--text); font-family:-apple-system,'PingF
 <div class="section">
   <div class="section-title">到课名单</div>
   <div style="display:flex;justify-content:space-between;align-items:center;">
-    <div><span class="count-big" id="attendCount">0</span><span class="count-sub"> / 28 人</span></div>
+    <div><span class="count-big" id="attendCount">0</span><span class="count-sub"> / <span id="rosterTotal"></span> 人</span></div>
     <button class="btn btn-secondary btn-sm" onclick="pollAttendance()">刷新</button>
   </div>
   <ul class="attend-list" id="attendList">
@@ -145,6 +145,10 @@ body { background:var(--bg); color:var(--text); font-family:-apple-system,'PingF
 
 <script>
 initSB();
+document.addEventListener("DOMContentLoaded", () => {
+  const el = document.getElementById("rosterTotal");
+  if (el) el.textContent = ROSTER.length;
+});
 let currentSession = null;
 let pollTimer = null;
 let countdownTimer = null;
