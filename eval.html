@@ -57,15 +57,13 @@ function render() {
       <div class="grp-members">${members.join("、")}</div>
       ${ex ? `<div class="scored-tag">✓ ${ex.score} 分 · ${ex.comment||"无评语"}</div>` : ""}
       <label>分数（80–100）</label>
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
-        <input type="number" id="sv-${g.id}" min="80" max="100" value="${ex?.score||85}"
-          style="width:80px;padding:10px 12px;font-size:20px;font-weight:700;border:2px solid #6366f1;border-radius:10px;background:#fff;color:#111;text-align:center;"
-          oninput="clampScore('${g.id}')">
-        <div style="display:flex;gap:6px;flex-wrap:wrap;">
-          ${[85,88,90,92,95,100].map(s =>
-            `<button class="score-btn ${ex&&ex.score===s?"sel":""}" onclick="pickScore('${g.id}',${s},this)">${s}</button>`
-          ).join("")}
-        </div>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+        <input type="range" min="80" max="100" value="${ex?.score||85}" id="sr-${g.id}"
+          style="flex:1;"
+          oninput="document.getElementById('sv-${g.id}').value=this.value">
+        <input type="number" min="80" max="100" value="${ex?.score||85}" id="sv-${g.id}"
+          style="width:64px;padding:8px;font-size:18px;font-weight:700;border:2px solid #6366f1;border-radius:8px;text-align:center;"
+          oninput="document.getElementById('sr-${g.id}').value=Math.min(100,Math.max(80,this.value||85))">
       </div>
       <label>预设评语</label>
       <div class="preset-row" id="pr-${g.id}">
@@ -78,20 +76,8 @@ function render() {
   }).join("");
 }
 
-function clampScore(gid) {
-  const inp = document.getElementById(`sv-${gid}`);
-  let v = parseInt(inp.value);
-  if (v < 80) inp.value = 80;
-  if (v > 100) inp.value = 100;
-  // 取消快捷键高亮
-  document.querySelectorAll(`#card-${gid} .score-btn`).forEach(b => b.classList.remove("sel"));
-}
-
-function pickScore(gid, s, btn) {
-  document.getElementById(`sv-${gid}`).value = s;
-  document.querySelectorAll(`#card-${gid} .score-btn`).forEach(b => b.classList.remove("sel"));
-  btn.classList.add("sel");
-}
+function clampScore(gid) {}  // 保留空函数防止旧引用报错
+function pickScore(gid, s, btn) {}  // 保留空函数
 function pickPreset(gid, p, btn) {
   document.querySelectorAll(`#pr-${gid} .preset-btn`).forEach(b => b.classList.remove("sel"));
   btn.classList.add("sel");
