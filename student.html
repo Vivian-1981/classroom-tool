@@ -63,7 +63,20 @@ textarea:focus { outline:none; border-color:#6366f1; }
     <div id="errorBox" style="display:none;" class="error-msg"></div>
     <label>你的真实姓名</label>
     <input type="text" id="nameInput" placeholder="请输入中文姓名" autofocus autocomplete="name" inputmode="text">
-    <div class="hint">请填写花名册上的中文姓名，便于性别均衡分组。</div>
+    <div style="margin-top:16px;">
+      <label>性别</label>
+      <div style="display:flex;gap:10px;margin-top:8px;">
+        <button type="button" id="btnF" onclick="selectGender('F')"
+          style="flex:1;padding:12px;border-radius:10px;border:2px solid #6366f1;background:#eef2ff;color:#4338ca;font-size:16px;font-weight:700;cursor:pointer;">
+          👩 女
+        </button>
+        <button type="button" id="btnM" onclick="selectGender('M')"
+          style="flex:1;padding:12px;border-radius:10px;border:2px solid #e5e7eb;background:#fff;color:#374151;font-size:16px;font-weight:700;cursor:pointer;">
+          👨 男
+        </button>
+      </div>
+      <input type="hidden" id="genderInput" value="F">
+    </div>
     <button class="btn-submit" id="submitBtn" onclick="doCheckin()">确认签到 ✓</button>
   </div>
 </div>
@@ -121,6 +134,16 @@ const REACTIONS = ["👍 赞","⭐ 优秀","💡 有创意","🎤 表达清晰",
   showView("checkinView");
 })();
 
+function selectGender(g) {
+  document.getElementById("genderInput").value = g;
+  document.getElementById("btnF").style.cssText = g === "F"
+    ? "flex:1;padding:12px;border-radius:10px;border:2px solid #6366f1;background:#eef2ff;color:#4338ca;font-size:16px;font-weight:700;cursor:pointer;"
+    : "flex:1;padding:12px;border-radius:10px;border:2px solid #e5e7eb;background:#fff;color:#374151;font-size:16px;font-weight:700;cursor:pointer;";
+  document.getElementById("btnM").style.cssText = g === "M"
+    ? "flex:1;padding:12px;border-radius:10px;border:2px solid #6366f1;background:#eef2ff;color:#4338ca;font-size:16px;font-weight:700;cursor:pointer;"
+    : "flex:1;padding:12px;border-radius:10px;border:2px solid #e5e7eb;background:#fff;color:#374151;font-size:16px;font-weight:700;cursor:pointer;";
+}
+
 // ── 签到 ─────────────────────────────────────────────────────────
 async function doCheckin() {
   const name = document.getElementById("nameInput").value.trim();
@@ -128,10 +151,15 @@ async function doCheckin() {
   const btn = document.getElementById("submitBtn");
   btn.disabled = true; btn.textContent = "提交中…";
 
+  // 优先用学生自己选的性别，花名册作为默认值
+  const rosterGender = getGender(name);
+  const selectedGender = document.getElementById("genderInput").value;
+  // 如果名字在花名册中：用花名册；否则用学生自选
+  const gender = ROSTER.some(r => r[0] === name) ? rosterGender : selectedGender;
+
   const { error } = await sb.from("attendance").insert({
-    session_id: sessionId, name, gender: getGender(name)
+    session_id: sessionId, name, gender
   });
-  // error.code === '23505' = unique violation = 已签到过，忽略
   localStorage.setItem("sb_my_name", name);
   localStorage.setItem("sb_my_session", sessionId);
   myName = name; mySessId = sessionId;
