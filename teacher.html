@@ -151,10 +151,23 @@ let countdownTimer = null;
 let attendData = [];
 
 (async function init() {
-  const savedId = localStorage.getItem("sb_session_id");
-  if (!savedId) return;
-  const { data } = await sb.from("class_sessions").select("*").eq("id", savedId).eq("is_active", true).single();
-  if (data) setSession(data);
+  // 先查本地记录
+  let savedId = localStorage.getItem("sb_session_id");
+
+  if (savedId) {
+    const { data } = await sb.from("class_sessions").select("*").eq("id", savedId).eq("is_active", true).single();
+    if (data) { setSession(data); return; }
+  }
+
+  // 本地没记录，从 Supabase 找最近一个活跃课堂（支持换设备/测试数据场景）
+  const { data } = await sb.from("class_sessions")
+    .select("*").eq("is_active", true)
+    .order("created_at", { ascending: false })
+    .limit(1).single();
+  if (data) {
+    localStorage.setItem("sb_session_id", data.id);
+    setSession(data);
+  }
 })();
 
 async function newSession() {
