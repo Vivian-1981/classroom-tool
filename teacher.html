@@ -112,7 +112,11 @@ body { background:var(--bg); color:var(--text); font-family:-apple-system,'PingF
       <option value="4" selected>4人一组</option>
       <option value="5">5人一组</option>
       <option value="6">6人一组</option>
+      <option value="custom">自定义…</option>
     </select>
+    <input type="number" id="grpSizeCustom" min="2" max="20" value="4"
+      style="display:none;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px 14px;font-size:15px;width:90px;"
+      oninput="updatePinOptions()">
     <button class="btn btn-green" onclick="doGroup()">⚡ 一键分组</button>
   </div>
 
@@ -247,9 +251,24 @@ function togglePin() {
   if (panel.style.display !== "none") updatePinOptions();
 }
 
+function getGrpSize() {
+  const sel = document.getElementById("grpSize");
+  if (sel.value === "custom") {
+    return parseInt(document.getElementById("grpSizeCustom").value) || 4;
+  }
+  return parseInt(sel.value);
+}
+
+// 切换到自定义时显示输入框
+document.getElementById("grpSize").addEventListener("change", function() {
+  const custom = document.getElementById("grpSizeCustom");
+  custom.style.display = this.value === "custom" ? "" : "none";
+  updatePinOptions();
+});
+
 function updatePinOptions() {
   if (!attendData.length) return;
-  const size = parseInt(document.getElementById("grpSize").value);
+  const size = getGrpSize();
   const numGroups = Math.ceil(attendData.length / size);
   document.getElementById("expectedGroups").textContent = numGroups;
 
@@ -269,7 +288,7 @@ function updatePinOptions() {
 // ── 分组（支持内幕约束） ──────────────────────────────────────────
 async function doGroup() {
   if (!currentSession || !attendData.length) { toast("请先等学生签到"); return; }
-  const size = parseInt(document.getElementById("grpSize").value);
+  const size = getGrpSize();
   const numGroups = Math.ceil(attendData.length / size);
 
   // 读取内幕约束
