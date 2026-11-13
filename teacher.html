@@ -105,18 +105,35 @@ body { background:var(--bg); color:var(--text); font-family:-apple-system,'PingF
 
 <div class="section">
   <div class="section-title">随机分组</div>
-  <div class="group-ctrl">
-    <select class="size-select" id="grpSize" onchange="onSizeChange()">
-      <option value="2">2人一组</option>
-      <option value="3">3人一组</option>
-      <option value="4" selected>4人一组</option>
-      <option value="5">5人一组</option>
-      <option value="6">6人一组</option>
-      <option value="custom">自定义…</option>
-    </select>
-    <input type="number" id="grpSizeCustom" min="2" max="20" value="4"
-      style="display:none;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px 14px;font-size:15px;width:90px;"
-      oninput="updatePinOptions()">
+  <div class="group-ctrl" style="flex-wrap:wrap;gap:10px;">
+    <!-- 模式切换 -->
+    <div style="display:flex;background:var(--bg);border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+      <button id="modeBySize" onclick="setGrpMode('size')"
+        style="padding:9px 14px;border:none;font-size:13px;font-weight:600;cursor:pointer;background:#6366f1;color:#fff;">每组人数</button>
+      <button id="modeByCount" onclick="setGrpMode('count')"
+        style="padding:9px 14px;border:none;font-size:13px;font-weight:600;cursor:pointer;background:transparent;color:var(--muted);">共几组</button>
+    </div>
+    <!-- 每组人数模式 -->
+    <div id="bySizeCtrl" style="display:flex;align-items:center;gap:8px;">
+      <select class="size-select" id="grpSize" onchange="onSizeChange()">
+        <option value="2">2人</option>
+        <option value="3">3人</option>
+        <option value="4" selected>4人</option>
+        <option value="5">5人</option>
+        <option value="6">6人</option>
+        <option value="custom">自定义…</option>
+      </select>
+      <input type="number" id="grpSizeCustom" min="2" max="30" value="4"
+        style="display:none;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px 14px;font-size:15px;width:80px;"
+        oninput="updatePinOptions()">
+    </div>
+    <!-- 共几组模式 -->
+    <div id="byCountCtrl" style="display:none;align-items:center;gap:8px;">
+      <input type="number" id="grpCount" min="1" max="30" value="9" placeholder="组数"
+        style="background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px 14px;font-size:15px;width:80px;"
+        oninput="updatePinOptions()">
+      <span style="font-size:14px;color:var(--muted);">组</span>
+    </div>
     <button class="btn btn-green" onclick="doGroup()">⚡ 一键分组</button>
   </div>
 
@@ -268,11 +285,26 @@ function togglePin() {
   if (panel.style.display !== "none") updatePinOptions();
 }
 
+let grpMode = "size";
+
+function setGrpMode(mode) {
+  grpMode = mode;
+  document.getElementById("bySizeCtrl").style.display  = mode === "size"  ? "flex" : "none";
+  document.getElementById("byCountCtrl").style.display = mode === "count" ? "flex" : "none";
+  const on  = "padding:9px 14px;border:none;font-size:13px;font-weight:600;cursor:pointer;background:#6366f1;color:#fff;";
+  const off = "padding:9px 14px;border:none;font-size:13px;font-weight:600;cursor:pointer;background:transparent;color:var(--muted);";
+  document.getElementById("modeBySize").style.cssText  = mode === "size"  ? on : off;
+  document.getElementById("modeByCount").style.cssText = mode === "count" ? on : off;
+  updatePinOptions();
+}
+
 function getGrpSize() {
-  const sel = document.getElementById("grpSize");
-  if (sel.value === "custom") {
-    return parseInt(document.getElementById("grpSizeCustom").value) || 4;
+  if (grpMode === "count") {
+    const count = parseInt(document.getElementById("grpCount").value) || 1;
+    return Math.ceil((attendData.length || 1) / count);
   }
+  const sel = document.getElementById("grpSize");
+  if (sel.value === "custom") return parseInt(document.getElementById("grpSizeCustom").value) || 4;
   return parseInt(sel.value);
 }
 
