@@ -105,39 +105,21 @@ body { background:var(--bg); color:var(--text); font-family:-apple-system,'PingF
 
 <div class="section">
   <div class="section-title">随机分组</div>
-  <div class="group-ctrl" style="flex-wrap:wrap;gap:10px;">
-    <!-- 模式切换 -->
-    <div style="display:flex;background:var(--bg);border:1px solid var(--border);border-radius:8px;overflow:hidden;">
-      <button id="modeBySize" onclick="setGrpMode('size')"
-        style="padding:9px 14px;border:none;font-size:13px;font-weight:600;cursor:pointer;background:#6366f1;color:#fff;">每组人数</button>
-      <button id="modeByCount" onclick="setGrpMode('count')"
-        style="padding:9px 14px;border:none;font-size:13px;font-weight:600;cursor:pointer;background:transparent;color:var(--muted);">共几组</button>
+  <div class="group-ctrl" style="align-items:center;gap:0;">
+    <input type="number" id="grpNum" min="1" max="30" value="7"
+      style="background:var(--bg);border:1px solid var(--border);border-right:none;color:var(--text);border-radius:8px 0 0 8px;padding:10px 14px;font-size:16px;font-weight:700;width:72px;text-align:center;"
+      oninput="updatePinOptions()">
+    <div style="display:flex;border:1px solid var(--border);border-radius:0 8px 8px 0;overflow:hidden;">
+      <button id="unitSize" onclick="setGrpMode('size')"
+        style="padding:10px 14px;border:none;font-size:13px;font-weight:600;cursor:pointer;background:var(--bg);color:var(--muted);border-right:1px solid var(--border);">人/组</button>
+      <button id="unitCount" onclick="setGrpMode('count')"
+        style="padding:10px 14px;border:none;font-size:13px;font-weight:600;cursor:pointer;background:#6366f1;color:#fff;">组</button>
     </div>
-    <!-- 每组人数模式 -->
-    <div id="bySizeCtrl" style="display:flex;align-items:center;gap:8px;">
-      <select class="size-select" id="grpSize" onchange="onSizeChange()">
-        <option value="2">2人</option>
-        <option value="3">3人</option>
-        <option value="4" selected>4人</option>
-        <option value="5">5人</option>
-        <option value="6">6人</option>
-        <option value="custom">自定义…</option>
-      </select>
-      <input type="number" id="grpSizeCustom" min="2" max="30" value="4"
-        style="display:none;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px 14px;font-size:15px;width:80px;"
-        oninput="updatePinOptions()">
-    </div>
-    <!-- 共几组模式 -->
-    <div id="byCountCtrl" style="display:none;align-items:center;gap:8px;">
-      <input type="number" id="grpCount" min="1" max="30" value="9" placeholder="组数"
-        style="background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px 14px;font-size:15px;width:80px;"
-        oninput="updatePinOptions()">
-      <span style="font-size:14px;color:var(--muted);">组</span>
-    </div>
-    <button class="btn btn-green" onclick="doGroup()">⚡ 一键分组</button>
+    <button class="btn btn-green" style="margin-left:10px;" onclick="doGroup()">⚡ 一键分组</button>
   </div>
+  <p id="grpPreview" style="font-size:13px;color:var(--muted);margin-top:8px;"></p>
 
-  <!-- 内幕设置 -->
+    <!-- 内幕设置 -->
   <div style="margin-top:14px;">
     <button onclick="togglePin()" style="background:none;border:1px dashed var(--border);color:var(--muted);padding:8px 14px;border-radius:8px;font-size:13px;cursor:pointer;width:100%;">
       🔒 内幕设置（指定某人必须在某组）
@@ -285,54 +267,67 @@ function togglePin() {
   if (panel.style.display !== "none") updatePinOptions();
 }
 
-let grpMode = "size";
+let grpMode = "count";
 
 function setGrpMode(mode) {
   grpMode = mode;
-  document.getElementById("bySizeCtrl").style.display  = mode === "size"  ? "flex" : "none";
-  document.getElementById("byCountCtrl").style.display = mode === "count" ? "flex" : "none";
-  const on  = "padding:9px 14px;border:none;font-size:13px;font-weight:600;cursor:pointer;background:#6366f1;color:#fff;";
-  const off = "padding:9px 14px;border:none;font-size:13px;font-weight:600;cursor:pointer;background:transparent;color:var(--muted);";
-  document.getElementById("modeBySize").style.cssText  = mode === "size"  ? on : off;
-  document.getElementById("modeByCount").style.cssText = mode === "count" ? on : off;
+  const on  = "padding:10px 14px;border:none;font-size:13px;font-weight:600;cursor:pointer;background:#6366f1;color:#fff;border-right:1px solid var(--border);";
+  const off = "padding:10px 14px;border:none;font-size:13px;font-weight:600;cursor:pointer;background:var(--bg);color:var(--muted);";
+  document.getElementById("unitSize").style.cssText  = mode === "size"  ? on : off;
+  document.getElementById("unitCount").style.cssText = mode === "count"
+    ? on.replace("border-right:1px solid var(--border);","") : off;
   updatePinOptions();
 }
 
 function getGrpSize() {
-  if (grpMode === "count") {
-    const count = parseInt(document.getElementById("grpCount").value) || 1;
-    return Math.ceil((attendData.length || 1) / count);
-  }
-  const sel = document.getElementById("grpSize");
-  if (sel.value === "custom") return parseInt(document.getElementById("grpSizeCustom").value) || 4;
-  return parseInt(sel.value);
+  const n = parseInt(document.getElementById("grpNum").value) || 4;
+  if (grpMode === "count") return Math.ceil((attendData.length || 1) / n);
+  return n;
 }
 
-function onSizeChange() {
-  const sel = document.getElementById("grpSize");
-  const custom = document.getElementById("grpSizeCustom");
-  custom.style.display = sel.value === "custom" ? "" : "none";
-  if (sel.value === "custom") custom.focus();
-  updatePinOptions();
-}
+function onSizeChange() { updatePinOptions(); }
 
 function updatePinOptions() {
   if (!attendData.length) return;
   const size = getGrpSize();
-  const numGroups = Math.ceil(attendData.length / size);
+  const n = attendData.length;
+  const numGroups = Math.ceil(n / size);
   document.getElementById("expectedGroups").textContent = numGroups;
+  // 均匀分配预览
+  const base = Math.floor(n / numGroups);
+  const big  = n - base * numGroups;
+  const preview = document.getElementById("grpPreview");
+  if (preview) {
+    if (big === 0) {
+      preview.textContent = n + " 人 → 共 " + numGroups + " 组，每组 " + base + " 人";
+    } else {
+      preview.textContent = n + " 人 → 共 " + numGroups + " 组（" + big + " 组×" + (base+1) + " 人，" + (numGroups-big) + " 组×" + base + " 人）";
+    }
+  }
 
   const groupOptions = Array.from({length: numGroups}, (_, i) =>
     `<option value="${i+1}">第 ${i+1} 组</option>`).join("");
 
-  document.getElementById("pinList").innerHTML = attendData.map(s => `
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);">
+  // 保存当前选择，重建时恢复（防止调整组数时选择被重置）
+  const saved = {};
+  attendData.forEach(s => {
+    const el = document.getElementById("pin-" + s.name);
+    if (el && el.value) saved[s.name] = el.value;
+  });
+
+  document.getElementById("pinList").innerHTML = attendData.map(s => {
+    const cur = saved[s.name] && parseInt(saved[s.name]) <= numGroups ? saved[s.name] : "";
+    const opts = `<option value="">随机</option>` +
+      Array.from({length: numGroups}, (_, i) =>
+        `<option value="${i+1}" ${cur == i+1 ? "selected" : ""}>第 ${i+1} 组</option>`
+      ).join("");
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);">
       <span style="font-size:15px;">${s.name}</span>
       <select id="pin-${s.name}" style="background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:5px 8px;font-size:13px;">
-        <option value="">随机</option>
-        ${groupOptions}
+        ${opts}
       </select>
-    </div>`).join("");
+    </div>`;
+  }).join("");
 }
 
 // ── 分组（支持内幕约束） ──────────────────────────────────────────
@@ -368,12 +363,16 @@ async function doGroup() {
     if (mi < males.length)   mixed.push(males[mi++].name);
   }
 
-  // 按顺序填满每组，直到 size
+  // 均匀分配：baseSize 每组，bigCount 组多1人
+  const totalN   = attendData.length;
+  const baseSize = Math.floor(totalN / numGroups);
+  const bigCount = totalN - baseSize * numGroups;
   let pool = [...mixed];
-  for (let g of groups) {
-    while (g.length < size && pool.length > 0) g.push(pool.shift());
+  for (let i = 0; i < groups.length; i++) {
+    const target = groups[i].length + (i < bigCount ? (baseSize + 1) : baseSize);
+    while (groups[i].length < target && pool.length > 0) groups[i].push(pool.shift());
   }
-  // 若还有剩余（内幕人员挤满了某组），追加到最后一组
+  // 若还有剩余（内幕人员已超额），追加到最后一组
   while (pool.length > 0) groups[groups.length - 1].push(pool.shift());
 
   // 过滤空组
