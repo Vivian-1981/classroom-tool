@@ -75,7 +75,7 @@ body { background:var(--bg); color:var(--text); font-family:-apple-system,'PingF
     </label>
     <div id="intervalGroup" style="display:flex;align-items:center;gap:8px;">
       <span style="font-size:14px;color:var(--muted);">间隔</span>
-      <select class="size-select" id="qrInterval" style="padding:6px 10px;" onchange="buildQR()">
+      <select class="size-select" id="qrInterval" style="padding:6px 10px;" onchange="buildQR(); if(currentSession) startCountdown();">
         <option value="30">30 秒</option>
         <option value="60">1 分钟</option>
         <option value="120">2 分钟</option>
@@ -167,7 +167,11 @@ let attendData = [];
   const loadId = new URLSearchParams(location.search).get("load");
   if (!loadId) return;
   const { data } = await sb.from("class_sessions").select("*").eq("id", loadId).single();
-  if (data) setSession(data);
+  if (data) {
+    setSession(data);
+    // 清除 URL 参数，防止刷新时重复加载
+    history.replaceState(null, "", location.pathname);
+  }
 })();
 
 async function newSession() {
