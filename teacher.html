@@ -53,13 +53,16 @@ body { background:var(--bg); color:var(--text); font-family:-apple-system,'PingF
 <body>
 <div class="topbar">
   <h1>📋 老师端</h1>
-  <span class="session-badge" id="sessionBadge">未开始</span>
+  <div style="display:flex;align-items:center;gap:8px;">
+    <span class="session-badge" id="sessionBadge">未开始</span>
+    <button id="endSessionBtn" onclick="endSession()" style="display:none;background:none;border:1px solid rgba(239,68,68,.4);color:#ef4444;padding:4px 10px;border-radius:6px;font-size:12px;cursor:pointer;">结束课堂</button>
+  </div>
 </div>
 
 <div class="section">
   <div class="section-title">开始课堂</div>
   <div class="session-form">
-    <input type="text" id="sessionLabel" placeholder="课堂标题（可留空）">
+    <input type="text" id="sessionLabel" placeholder="课堂标题（必填）">
     <button class="btn btn-primary btn-sm" onclick="newSession()">开始</button>
   </div>
   <!-- 二维码模式选择 -->
@@ -182,6 +185,7 @@ async function newSession() {
 function setSession(sess) {
   currentSession = sess;
   document.getElementById("sessionBadge").textContent = sess.label;
+  document.getElementById("endSessionBtn").style.display = "";
   document.getElementById("qrSection").style.display = "";
   buildQR();
   startCountdown();
@@ -228,6 +232,22 @@ function startCountdown() {
   }
   tick();
   countdownTimer = setInterval(tick, 1000);
+}
+
+function endSession() {
+  if (!confirm("结束当前课堂？签到和分组数据已保存在看板中。")) return;
+  if (pollTimer) clearInterval(pollTimer);
+  if (countdownTimer) clearInterval(countdownTimer);
+  localStorage.removeItem("sb_session_id");
+  currentSession = null;
+  document.getElementById("sessionBadge").textContent = "未开始";
+  document.getElementById("endSessionBtn").style.display = "none";
+  document.getElementById("qrSection").style.display = "none";
+  document.getElementById("groupsArea").innerHTML = "";
+  document.getElementById("groupsLinks").style.display = "none";
+  document.getElementById("attendList").innerHTML = '<li><div class="empty">等待学生扫码签到…</div></li>';
+  document.getElementById("attendCount").textContent = "0";
+  document.getElementById("sessionLabel").value = "";
 }
 
 function endCheckin() {
