@@ -105,17 +105,12 @@ body { background:var(--bg); color:var(--text); font-family:-apple-system,'PingF
 
 <div class="section">
   <div class="section-title">随机分组</div>
-  <div class="group-ctrl" style="align-items:center;gap:0;">
+  <div class="group-ctrl" style="align-items:center;gap:10px;">
     <input type="number" id="grpNum" min="1" max="30" value="7"
-      style="background:var(--bg);border:1px solid var(--border);border-right:none;color:var(--text);border-radius:8px 0 0 8px;padding:10px 14px;font-size:16px;font-weight:700;width:72px;text-align:center;"
+      style="background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px 14px;font-size:18px;font-weight:700;width:80px;text-align:center;"
       oninput="updatePinOptions()">
-    <div style="display:flex;border:1px solid var(--border);border-radius:0 8px 8px 0;overflow:hidden;">
-      <button id="unitSize" onclick="setGrpMode('size')"
-        style="padding:10px 14px;border:none;font-size:13px;font-weight:600;cursor:pointer;background:var(--bg);color:var(--muted);border-right:1px solid var(--border);">人/组</button>
-      <button id="unitCount" onclick="setGrpMode('count')"
-        style="padding:10px 14px;border:none;font-size:13px;font-weight:600;cursor:pointer;background:#6366f1;color:#fff;">组</button>
-    </div>
-    <button class="btn btn-green" style="margin-left:10px;" onclick="doGroup()">⚡ 一键分组</button>
+    <span style="font-size:15px;color:var(--muted);">组</span>
+    <button class="btn btn-green" onclick="doGroup()">⚡ 一键分组</button>
   </div>
   <p id="grpPreview" style="font-size:13px;color:var(--muted);margin-top:8px;"></p>
 
@@ -154,28 +149,17 @@ let countdownTimer = null;
 let attendData = [];
 
 (async function init() {
-  // 先查本地记录
-  let savedId = localStorage.getItem("sb_session_id");
-
-  if (savedId) {
-    const { data } = await sb.from("class_sessions").select("*").eq("id", savedId).eq("is_active", true).single();
-    if (data) { setSession(data); return; }
-  }
-
-  // 本地没记录，从 Supabase 找最近一个活跃课堂（支持换设备/测试数据场景）
-  const { data } = await sb.from("class_sessions")
-    .select("*").eq("is_active", true)
-    .order("created_at", { ascending: false })
-    .limit(1).single();
-  if (data) {
-    localStorage.setItem("sb_session_id", data.id);
-    setSession(data);
-  }
+  // 只恢复本设备上次的课堂（localStorage），不自动查 Supabase
+  // 避免打开页面就显示旧课堂的二维码
+  const savedId = localStorage.getItem("sb_session_id");
+  if (!savedId) return;
+  const { data } = await sb.from("class_sessions").select("*").eq("id", savedId).eq("is_active", true).single();
+  if (data) setSession(data);
 })();
 
 async function newSession() {
-  const label = document.getElementById("sessionLabel").value.trim()
-    || new Date().toLocaleDateString("zh-CN") + " 课堂";
+  const label = document.getElementById("sessionLabel").value.trim();
+  if (!label) { toast("请先填写课堂标题"); return; }
   if (currentSession) await sb.from("class_sessions").update({ is_active: false }).eq("id", currentSession.id);
   const { data, error } = await sb.from("class_sessions").insert({ label }).select().single();
   if (error) { toast("创建失败: " + error.message); return; }
