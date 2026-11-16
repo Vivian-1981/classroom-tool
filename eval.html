@@ -54,7 +54,7 @@ function render() {
     const ex = scores[g.id];
     return `<div class="grp-card ${ex?"scored":""}" id="card-${g.id}">
       <div class="grp-num">第 ${g.group_num} 组 · ${members.length} 人</div>
-      <div class="grp-members">${members.join("、")}</div>
+      <div class="grp-members">${members.map(m=>typeof m==='string'?m:m.n).join("、")}</div>
       ${ex ? `<div class="scored-tag">✓ ${ex.score} 分 · ${ex.comment||"无评语"}</div>` : ""}
       <label>分数（80–100）</label>
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
