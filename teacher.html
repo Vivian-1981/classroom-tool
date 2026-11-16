@@ -396,13 +396,26 @@ async function doGroup() {
   const males   = free.filter(s => s.gender === "M").map(s => ({ n: s.name, g: "M" })).sort(() => Math.random() - .5);
   const females = free.filter(s => s.gender !== "M").map(s => ({ n: s.name, g: "F" })).sort(() => Math.random() - .5);
 
-  // 把男生均匀插入女生队列（男生位置：0, spacing, 2*spacing...）
+  // 把男生均匀插入女生队列
   const spacing = females.length > 0 && males.length > 0 ? Math.floor(females.length / males.length) : 1;
   const ordered = [...females];
   males.forEach((m, i) => ordered.splice(Math.min(i * (spacing + 1), ordered.length), 0, m));
 
-  // 取模轮流分配到各组（保证每组人数差不超过1）
-  ordered.forEach((person, idx) => groups[idx % numGroups].push(person));
+  // 每组总目标人数（考虑已有内幕成员）
+  const totalPeople = attendData.length;
+  const basePerGroup = Math.floor(totalPeople / numGroups);
+  const extraGroups  = totalPeople % numGroups;
+  const groupTargets = groups.map((g, i) => basePerGroup + (i < extraGroups ? 1 : 0));
+
+  // 按顺序填满每组（自动跳过已被内幕占满的组）
+  let oi = 0;
+  for (let gi = 0; gi < groups.length && oi < ordered.length; gi++) {
+    while (groups[gi].length < groupTargets[gi] && oi < ordered.length) {
+      groups[gi].push(ordered[oi++]);
+    }
+  }
+  // 兜底：如有剩余追加到最后一组
+  while (oi < ordered.length) groups[groups.length - 1].push(ordered[oi++]);
 
   // 过滤空组
   const finalGroups = groups.filter(g => g.length > 0);
