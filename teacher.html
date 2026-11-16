@@ -83,19 +83,34 @@ body { background:var(--bg); color:var(--text); font-family:-apple-system,'PingF
 </div>
 
 <div class="section" id="qrSection" style="display:none;">
-  <div class="section-title">签到二维码</div>
-  <div class="qr-wrap"><div id="qr-container"></div></div>
-  <div class="countdown-row">
-    <div class="countdown-bar"><div class="countdown-fill" id="cntFill" style="width:100%"></div></div>
-    <div class="countdown-txt" id="cntTxt">30s</div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+    <div class="section-title" style="margin-bottom:0;">签到二维码</div>
+    <button onclick="endCheckin()" class="btn btn-secondary btn-sm" style="font-size:13px;">🔒 结束签到</button>
   </div>
-  <div class="qr-url" id="qrUrl"></div>
+  <div id="qrActive">
+    <div class="qr-wrap"><div id="qr-container"></div></div>
+    <div class="countdown-row">
+      <div class="countdown-bar"><div class="countdown-fill" id="cntFill" style="width:100%"></div></div>
+      <div class="countdown-txt" id="cntTxt">30s</div>
+    </div>
+    <div class="qr-url" id="qrUrl"></div>
+  </div>
+  <div id="qrEnded" style="display:none;padding:16px;text-align:center;color:var(--muted);font-size:15px;">
+    🔒 签到已结束 · <button onclick="reopenCheckin()" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:14px;">重新开放</button>
+  </div>
 </div>
 
 <div class="section">
   <div class="section-title">到课名单</div>
   <div style="display:flex;justify-content:space-between;align-items:center;">
-    <div><span class="count-big" id="attendCount">0</span><span class="count-sub"> / <span id="rosterTotal"></span> 人</span></div>
+    <div style="display:flex;align-items:baseline;gap:6px;">
+      <span class="count-big" id="attendCount">0</span>
+      <span class="count-sub"> / </span>
+      <input type="number" id="rosterTotal" min="1" max="200" placeholder="总人数"
+        style="width:52px;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--muted);font-size:14px;text-align:center;padding:0 4px;"
+        title="班级总人数（可修改）">
+      <span class="count-sub">人</span>
+    </div>
     <button class="btn btn-secondary btn-sm" onclick="pollAttendance()">刷新</button>
   </div>
   <ul class="attend-list" id="attendList">
@@ -139,10 +154,6 @@ body { background:var(--bg); color:var(--text); font-family:-apple-system,'PingF
 
 <script>
 initSB();
-document.addEventListener("DOMContentLoaded", () => {
-  const el = document.getElementById("rosterTotal");
-  if (el) el.textContent = ROSTER.length;
-});
 let currentSession = null;
 let pollTimer = null;
 let countdownTimer = null;
@@ -217,6 +228,19 @@ function startCountdown() {
   }
   tick();
   countdownTimer = setInterval(tick, 1000);
+}
+
+function endCheckin() {
+  if (countdownTimer) clearInterval(countdownTimer);
+  document.getElementById("qrActive").style.display = "none";
+  document.getElementById("qrEnded").style.display = "";
+}
+
+function reopenCheckin() {
+  document.getElementById("qrActive").style.display = "";
+  document.getElementById("qrEnded").style.display = "none";
+  buildQR();
+  startCountdown();
 }
 
 function startPoll() {
