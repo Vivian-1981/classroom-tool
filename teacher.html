@@ -162,14 +162,7 @@ let pollTimer = null;
 let countdownTimer = null;
 let attendData = [];
 
-(async function init() {
-  // 只恢复本设备上次的课堂（localStorage），不自动查 Supabase
-  // 避免打开页面就显示旧课堂的二维码
-  const savedId = localStorage.getItem("sb_session_id");
-  if (!savedId) return;
-  const { data } = await sb.from("class_sessions").select("*").eq("id", savedId).eq("is_active", true).single();
-  if (data) setSession(data);
-})();
+// 不自动恢复上次课堂，老师每次需要手动填标题点「开始」
 
 async function newSession() {
   const label = document.getElementById("sessionLabel").value.trim();
