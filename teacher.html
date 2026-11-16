@@ -155,6 +155,8 @@ body { background:var(--bg); color:var(--text); font-family:-apple-system,'PingF
   <a href="dashboard.html" class="btn btn-secondary btn-full" style="text-align:center;">📈 历史数据看板</a>
 </div>
 
+<div class="toast" id="toast"></div>
+
 <script>
 initSB();
 let currentSession = null;
@@ -243,6 +245,7 @@ function endSession() {
   if (countdownTimer) clearInterval(countdownTimer);
   localStorage.removeItem("sb_session_id");
   currentSession = null;
+  attendData = [];
   document.getElementById("sessionBadge").textContent = "未开始";
   document.getElementById("endSessionBtn").style.display = "none";
   document.getElementById("qrSection").style.display = "none";
@@ -365,6 +368,7 @@ function updatePinOptions() {
 async function doGroup() {
   if (!currentSession) { toast("请先开始课堂再分组"); return; }
   if (!attendData.length) { toast("请先等学生签到"); return; }
+  try {
   const size = getGrpSize();
   const numGroups = Math.ceil(attendData.length / size);
 
@@ -380,47 +384,53 @@ async function doGroup() {
 
   // 先放内幕指定的人
   Object.entries(pinned).forEach(([name, gi]) => {
-    if (gi < groups.length) groups[gi].push(name);
+    if (gi < groups.length) {
+      const s = attendData.find(s => s.name === name);
+      groups[gi].push({ n: name, g: s?.gender || "F" });
+    }
   });
 
-  // 剩余的人做性别均衡随机排列
+  // 剩余的人：性别均衡 + 均匀分配
   const pinnedNames = new Set(Object.keys(pinned));
   const free = attendData.filter(s => !pinnedNames.has(s.name));
-  const males   = free.filter(s => s.gender === "M").sort(() => Math.random() - .5);
-  const females = free.filter(s => s.gender === "F").sort(() => Math.random() - .5);
-  const mixed = [];
-  let mi = 0, fi = 0;
-  while (fi < females.length || mi < males.length) {
-    if (fi < females.length) mixed.push(females[fi++].name);
-    if (mi < males.length)   mixed.push(males[mi++].name);
-  }
+  const males   = free.filter(s => s.gender === "M").map(s => ({ n: s.name, g: "M" })).sort(() => Math.random() - .5);
+  const females = free.filter(s => s.gender !== "M").map(s => ({ n: s.name, g: "F" })).sort(() => Math.random() - .5);
 
-  // 均匀分配：baseSize 每组，bigCount 组多1人
-  const totalN   = attendData.length;
-  const baseSize = Math.floor(totalN / numGroups);
-  const bigCount = totalN - baseSize * numGroups;
-  let pool = [...mixed];
-  for (let i = 0; i < groups.length; i++) {
-    const target = groups[i].length + (i < bigCount ? (baseSize + 1) : baseSize);
-    while (groups[i].length < target && pool.length > 0) groups[i].push(pool.shift());
-  }
-  // 若还有剩余（内幕人员已超额），追加到最后一组
-  while (pool.length > 0) groups[groups.length - 1].push(pool.shift());
+  // 把男生均匀插入女生队列（男生位置：0, spacing, 2*spacing...）
+  const spacing = females.length > 0 && males.length > 0 ? Math.floor(females.length / males.length) : 1;
+  const ordered = [...females];
+  males.forEach((m, i) => ordered.splice(Math.min(i * (spacing + 1), ordered.length), 0, m));
+
+  // 取模轮流分配到各组（保证每组人数差不超过1）
+  ordered.forEach((person, idx) => groups[idx % numGroups].push(person));
 
   // 过滤空组
   const finalGroups = groups.filter(g => g.length > 0);
-
   // 保存
-  await sb.from("groups").delete().eq("session_id", currentSession.id);
+  const { error: delErr } = await sb.from("groups").delete().eq("session_id", currentSession.id);
+  if (delErr) { alert("删除旧分组失败：" + delErr.message); return; }
   for (let i = 0; i < finalGroups.length; i++) {
-    await sb.from("groups").insert({
+    const { error: insErr } = await sb.from("groups").insert({
       session_id: currentSession.id,
       group_num: i + 1,
       members: JSON.stringify(finalGroups[i])
     });
+    if (insErr) { alert("保存分组失败：" + insErr.message); return; }
   }
   toast(`分组完成，共 ${finalGroups.length} 组 ✓`);
   loadGroups();
+  } catch(e) {
+    alert("分组错误：" + (e.message || JSON.stringify(e)));
+  }
+}
+
+// 兼容新格式 {n,g} 和旧格式 string
+function memberName(m) { return typeof m === 'string' ? m : m.n; }
+function memberGender(m) { return typeof m === 'string' ? '' : m.g; }
+function memberLabel(m) {
+  const g = memberGender(m);
+  const badge = g ? `<span style="font-size:11px;padding:1px 6px;border-radius:99px;margin-left:4px;${g==='M'?'background:rgba(99,102,241,.2);color:#818cf8':'background:rgba(34,211,238,.12);color:#67e8f9'}">${g==='M'?'男':'女'}</span>` : '';
+  return memberName(m) + badge;
 }
 
 async function loadGroups() {
@@ -432,7 +442,7 @@ async function loadGroups() {
 
   area.innerHTML = `<div class="groups-grid">` + data.map(r => {
     const members = JSON.parse(r.members);
-    return `<div class="grp-card"><div class="grp-num">第 ${r.group_num} 组</div><div class="grp-names">${members.join("<br>")}</div></div>`;
+    return `<div class="grp-card"><div class="grp-num">第 ${r.group_num} 组 · ${members.length}人</div><div class="grp-names">${members.map(m => `<div>${memberLabel(m)}</div>`).join("")}</div></div>`;
   }).join("") + `</div>`;
 
   const bigUrl = location.href.replace("teacher.html", "groups.html") + `?s=${currentSession.id}`;
