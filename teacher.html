@@ -162,7 +162,13 @@ let pollTimer = null;
 let countdownTimer = null;
 let attendData = [];
 
-// 不自动恢复上次课堂，老师每次需要手动填标题点「开始」
+// 支持从 seed 页面传入 session ID（?load=xxx）
+(async function init() {
+  const loadId = new URLSearchParams(location.search).get("load");
+  if (!loadId) return;
+  const { data } = await sb.from("class_sessions").select("*").eq("id", loadId).single();
+  if (data) setSession(data);
+})();
 
 async function newSession() {
   const label = document.getElementById("sessionLabel").value.trim();
