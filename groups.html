@@ -44,7 +44,7 @@ async function load() {
     const members = JSON.parse(r.members);
     return `<div class="grp">
       <div class="grp-num">第 ${r.group_num} 组 · ${members.length} 人</div>
-      ${members.map(m => `<div class="member"><div class="avatar">${m[0]}</div><span>${m}</span></div>`).join("")}
+      ${members.map(m => { const nm = typeof m === "string" ? m : m.n; const g = typeof m === "string" ? "" : m.g; return `<div class="member"><div class="avatar ${g==="M"?"avatar-m":""}">${nm[0]}</div><span>${nm}</span>${g ? `<span style="font-size:11px;margin-left:4px;color:${g==="M"?"#818cf8":"#67e8f9"}">${g==="M"?"男":"女"}</span>` : ""}</div>`; }).join("")}
     </div>`;
   }).join("");
 }

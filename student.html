@@ -194,10 +194,10 @@ async function loadGroups() {
   status.textContent = `共 ${data.length} 组`;
   grid.innerHTML = data.map(r => {
     const members = JSON.parse(r.members);
-    const isMine = members.includes(myName);
+    const isMine = members.some(m => (typeof m === 'string' ? m : m.n) === myName);
     return `<div class="grp-card ${isMine?"mine":""}">
       <div class="grp-num">第 ${r.group_num} 组 ${isMine?"⭐ 你在这组":""}</div>
-      <div class="grp-name">${members.join("  ·  ")}</div>
+      <div class="grp-name">${members.map(m=>typeof m==="string"?m:m.n).join("  ·  ")}</div>
     </div>`;
   }).join("");
 }
