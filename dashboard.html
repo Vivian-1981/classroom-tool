@@ -225,7 +225,7 @@ async function loadDetail(sessId, label) {
         const members = JSON.parse(g.members);
         return `<div class="grp-card">
           <div class="grp-num">第 ${g.group_num} 组 · ${members.length}人</div>
-          <div class="grp-names">${members.join("<br>")}</div>
+          <div class="grp-names">${members.map(m=>typeof m==="string"?m:m.n).join("<br>")}</div>
         </div>`;
       }).join("")
     : '<div class="empty" style="grid-column:1/-1">未分组</div>';
@@ -239,7 +239,7 @@ async function loadDetail(sessId, label) {
         return `<div class="score-card">
           <div class="score-left">
             <h4>第 ${s.groups?.group_num || "?"} 组</h4>
-            <p>${members.join("、") || ""}</p>
+            <p>${members.map(m=>typeof m==="string"?m:m.n).join("、") || ""}</p>
             ${s.comment ? `<p style="margin-top:6px;color:var(--text);">${s.comment}</p>` : ""}
           </div>
           <div class="score-num">${s.score}</div>
