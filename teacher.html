@@ -359,7 +359,8 @@ function updatePinOptions() {
 
 // ── 分组（支持内幕约束） ──────────────────────────────────────────
 async function doGroup() {
-  if (!currentSession || !attendData.length) { toast("请先等学生签到"); return; }
+  if (!currentSession) { toast("请先开始课堂再分组"); return; }
+  if (!attendData.length) { toast("请先等学生签到"); return; }
   const size = getGrpSize();
   const numGroups = Math.ceil(attendData.length / size);
 
