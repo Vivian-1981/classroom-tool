@@ -213,7 +213,7 @@ async function loadEval() {
     const members = JSON.parse(r.members);
     return `<div class="eval-card" id="ec-${r.id}">
       <div class="grp-num">第 ${r.group_num} 组</div>
-      <div style="font-size:14px;color:#374151;margin-bottom:10px;">${members.join("、")}</div>
+      <div style="font-size:14px;color:#374151;margin-bottom:10px;">${members.map(m=>typeof m==="string"?m:m.n).join("、")}</div>
       <div class="reactions" id="rxns-${r.id}">
         ${REACTIONS.map((rx,i) => `<button class="rxn ${i===0?"sel":""}" onclick="pickRxn('${r.id}','${rx}',this)">${rx}</button>`).join("")}
       </div>
